@@ -50,6 +50,7 @@ uint16_t valI = 0;
 uint64_t valE = 0;
 uint8_t initVal = -1;
 uint64_t period = 0;
+uint8_t pin2 = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -98,6 +99,8 @@ int main(void)
 
 
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
+  HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_1); //PA6
+  HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_2); //PA7
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -168,6 +171,16 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 }
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if((htim->Instance == TIM4) && (initVal > -1)) valE++;
+void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
+	if(pin2 == 0){
+		pin2 = 1;
+		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, TIM3_ARR);
+	}
+	else{
+		pin2 = 0;
+		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, TIM3_ARR_F2);
+	}
+	//if(htim->Instance == TIM3)
 }
 /* USER CODE END 4 */
 
