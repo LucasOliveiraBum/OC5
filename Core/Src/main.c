@@ -158,17 +158,22 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
+	//if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
 	if(initVal == -1) initVal = __HAL_TIM_GET_COUNTER(htim);
 	else{
 		valI = __HAL_TIM_GET_COUNTER(htim);
 		if(valE > 1) valE--;
-		period = TIM4_ARR - initVal + valI + TIM4_ARR * valE;
+		if(valE > 0) period = TIM4_ARR - initVal + valI + TIM4_ARR * valE;
+		else period = valI - initVal;
+		initVal = -1;
+		valE = 0;
 		//84000000/(TIM4_PSC+1)*(period+1) == freq do sinal
 	}
 }
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if((htim->Instance == TIM4) && (initVal > -1)) valE++;
 }
+
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
 	if(pin2 == 0){
 		pin2 = 1;
