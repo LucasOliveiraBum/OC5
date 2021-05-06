@@ -45,11 +45,12 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint16_t valI = 0;
-uint64_t valE = 0;
-uint8_t initVal = -1;
+uint8_t A = -1;
+uint16_t B = 0;
+uint64_t C = 0;
 uint64_t period = 0;
 uint8_t pin2 = 0;
+char msg[50];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -94,9 +95,13 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
+  MX_TIM10_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  HAL_TIM_Base_Start(&htim10);
+  HAL_TIM_Base_Start_IT(&htim2);
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1); //PB6
-  HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_1); //PA6
+  HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1); //PA6
   HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_2); //PA7
   /* USER CODE END 2 */
 
@@ -104,6 +109,12 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if((period > 0) && __HAL_TIM_GET_FLAG(&htim10, TIM_FLAG_UPDATE)){
+		 sprintf(msg, "Frequencia medida: %uHz\n\r",(uint64_t)(84000000/((TIM4_PSC+1)*(period+1))));
+		 period = 0;
+		 HAL_UART_Transmit_IT(&huart2, msg, strlen(msg));
+		 __HAL_TIM_CLEAR_FLAG(&htim10, TIM_FLAG_UPDATE);
+	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -158,30 +169,37 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
-	//if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
-	if(initVal == -1) initVal = __HAL_TIM_GET_COUNTER(htim);
+	if(A == -1) A = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
 	else{
-		valI = __HAL_TIM_GET_COUNTER(htim);
-		if(valE > 1) valE--;
-		if(valE > 0) period = TIM4_ARR - initVal + valI + TIM4_ARR * valE;
-		else period = valI - initVal;
-		initVal = -1;
-		valE = 0;
-		//84000000/(TIM4_PSC+1)*(period+1) == freq do sinal
+		B = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);	//Salvando onde o pulso estourou dentro do tim2
+		if(C > 0)
+		{
+			if(C > 1)
+			{
+				C--;	//ignorando o final do primeiro periodo
+				period = (TIM4_ARR - A + B) + TIM4_ARR * C;		// se entre o valor inicial e o valor final (Internal) houverem periodos completos do timer3
+			}
+			else period = (TIM4_ARR - A + B);	// se o valor inicial e o valor final (Internal) estiverem em periodos subsequentes do timer3
+		}
+		else period = B - A;		// se ainda estiver dentro do mesmo periodo do timer3
+		A = -1;
+		C = 0;
 	}
 }
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	if((htim->Instance == TIM4) && (initVal > -1)) valE++;
+	if((htim->Instance == TIM2) && (A > -1)) C++;
 }
 
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
-	if(pin2 == 0){
-		pin2 = 1;
-		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, TIM3_ARR);
-	}
-	else{
-		pin2 = 0;
-		__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, TIM3_ARR_F2);
+	if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2){
+		if(pin2 == 0){
+			pin2 = 1;
+			__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, TIM3_ARR);
+		}
+		else{
+			pin2 = 0;
+			__HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, TIM3_ARR_F2);
+		}
 	}
 }
 /* USER CODE END 4 */
